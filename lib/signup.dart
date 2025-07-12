@@ -1,21 +1,113 @@
+import 'dart:io';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'colors.dart'; // Make sure you have this file with your color constants
 
-class SignUpScreen extends StatelessWidget {
+class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
 
   @override
+  State<SignUpScreen> createState() => _SignUpScreenState();
+}
+
+class _SignUpScreenState extends State<SignUpScreen> {
+  XFile? _selectedImage; // Variable to store the selected image
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+  String? _nameError;
+  String? _emailError;
+  String? _passwordError;
+  String? _confirmPasswordError;
+
+  @override
+  void initState() {
+    super.initState();
+    // Add listeners for real-time validation
+    _nameController.addListener(_validateFields);
+    _emailController.addListener(_validateFields);
+    _passwordController.addListener(_validateFields);
+    _confirmPasswordController.addListener(_validateFields);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  // Function to pick an image from the gallery
+  Future<void> _pickImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        setState(() {
+          _selectedImage = image;
+        });
+      }
+    } catch (e) {
+      print("Error picking image: $e");
+    }
+  }
+
+  // Validate all fields in real-time
+  void _validateFields() {
+    setState(() {
+      // Validate NAME
+      _nameError = _nameController.text.isEmpty ? 'Name is required' : null;
+
+      // Validate EMAIL
+      final emailPattern = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+      _emailError = _emailController.text.isEmpty
+          ? 'Email is required'
+          : !emailPattern.hasMatch(_emailController.text)
+          ? 'Enter a valid email'
+          : null;
+
+      // Validate PASSWORD
+      final passwordPattern = RegExp(r'^(?=.*[A-Z])(?=.*[!@#$%^&*]).{8,}$');
+      _passwordError = _passwordController.text.isEmpty
+          ? 'Password is required'
+          : !passwordPattern.hasMatch(_passwordController.text)
+          ? 'Password must be at least 8 characters,\ninclude an uppercase letter and a special symbol'
+          : null;
+
+      // Validate CONFIRM PASSWORD
+      _confirmPasswordError = _confirmPasswordController.text.isEmpty
+          ? 'Confirm password is required'
+          : !passwordPattern.hasMatch(_confirmPasswordController.text)
+          ? 'Confirm password must be at least 8 characters, include an uppercase letter and a special symbol'
+          : _passwordController.text != _confirmPasswordController.text
+          ? 'Passwords do not match'
+          : null;
+    });
+  }
+
+  // Check if all fields are valid
+  bool _isFormValid() {
+    return _nameError == null &&
+        _emailError == null &&
+        _passwordError == null &&
+        _confirmPasswordError == null &&
+        _nameController.text.isNotEmpty &&
+        _emailController.text.isNotEmpty &&
+        _passwordController.text.isNotEmpty &&
+        _confirmPasswordController.text.isNotEmpty;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // The Scaffold body is a Stack to layer the form and the header circle.
     return Scaffold(
       backgroundColor: kWhite,
       body: Stack(
         children: [
-          // The form is aligned to the bottom and contains our scroll logic.
           _buildForm(context),
-
-          // The header circle floats on top.
           _buildHeaderCircle(context),
         ],
       ),
@@ -90,14 +182,11 @@ class SignUpScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- 1. THE FIXED PART (does not scroll) ---
-              const SizedBox(height: 40), // Space from the container's top edge
+              const SizedBox(height: 40),
               _buildHeaderText(context),
               const SizedBox(height: 20),
               _buildProfileIcon(),
               const SizedBox(height: 20),
-
-              // --- 2. THE SCROLLABLE PART ---
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
@@ -105,27 +194,45 @@ class SignUpScreen extends StatelessWidget {
                     children: [
                       const Text("NAME", style: TextStyle(color: kGreyText)),
                       const SizedBox(height: 8),
-                      _buildTextField(hint: 'Jiara Martins'),
+                      _buildTextField(
+                        hint: 'Jiara Martins',
+                        controller: _nameController,
+                        errorText: _nameError,
+                      ),
                       const SizedBox(height: 20),
                       const Text("EMAIL", style: TextStyle(color: kGreyText)),
                       const SizedBox(height: 8),
-                      _buildTextField(hint: 'hello@reallygreatsite.com'),
+                      _buildTextField(
+                        hint: 'hello@reallygreatsite.com',
+                        controller: _emailController,
+                        errorText: _emailError,
+                      ),
                       const SizedBox(height: 20),
                       const Text("PASSWORD", style: TextStyle(color: kGreyText)),
                       const SizedBox(height: 8),
-                      _buildTextField(hint: '******', obscureText: true),
+                      _buildTextField(
+                        hint: '******',
+                        obscureText: true,
+                        controller: _passwordController,
+                        errorText: _passwordError,
+                      ),
                       const SizedBox(height: 20),
                       const Text("CONFIRM PASSWORD",
                           style: TextStyle(color: kGreyText)),
                       const SizedBox(height: 8),
-                      _buildTextField(hint: '******', obscureText: true),
+                      _buildTextField(
+                        hint: '******',
+                        obscureText: true,
+                        controller: _confirmPasswordController,
+                        errorText: _confirmPasswordError,
+                      ),
                       const SizedBox(height: 30),
                       _buildSignUpButton(),
                       const SizedBox(height: 20),
                       _buildOrDivider(),
                       const SizedBox(height: 20),
                       _buildGoogleButton(),
-                      const SizedBox(height: 20), // Bottom padding for scroll
+                      const SizedBox(height: 20),
                     ],
                   ),
                 ),
@@ -137,8 +244,7 @@ class SignUpScreen extends StatelessWidget {
     );
   }
 
-  // --- ALL HELPER WIDGETS BELOW ARE UNCHANGED ---
-
+  // --- ALL HELPER WIDGETS BELOW ---
   Widget _buildHeaderText(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -173,28 +279,40 @@ class SignUpScreen extends StatelessWidget {
   Widget _buildProfileIcon() {
     return Center(
       child: GestureDetector(
-        onTap: () {
-          print("Profile icon tapped");
-        },
+        onTap: _pickImage,
         child: Container(
-          height: 60,
-          width: 60,
+          height: 90,
+          width: 90,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(color: kGreyText, width: 1.5),
+            image: _selectedImage != null
+                ? DecorationImage(
+              image: FileImage(File(_selectedImage!.path)),
+              fit: BoxFit.cover,
+            )
+                : null,
           ),
-          child: const Icon(Icons.person_outline, color: kGreyText, size: 30),
+          child: _selectedImage == null
+              ? const Icon(Icons.person_outline, color: kGreyText, size: 30)
+              : null,
         ),
       ),
     );
   }
 
-  Widget _buildTextField({required String hint, bool obscureText = false}) {
+  Widget _buildTextField({
+    required String hint,
+    bool obscureText = false,
+    TextEditingController? controller,
+    String? errorText,
+  }) {
     return TextField(
+      controller: controller,
       obscureText: obscureText,
       style: const TextStyle(color: kWhite),
       decoration: InputDecoration(
-        fillColor: kTextFieldBackground, // Make sure this color is in colors.dart
+        fillColor: kTextFieldBackground,
         filled: true,
         hintText: hint,
         hintStyle: const TextStyle(color: kGreyText),
@@ -204,6 +322,8 @@ class SignUpScreen extends StatelessWidget {
         ),
         contentPadding:
         const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+        errorText: errorText,
+        errorStyle: const TextStyle(color: Colors.redAccent),
       ),
     );
   }
@@ -213,7 +333,15 @@ class SignUpScreen extends StatelessWidget {
       width: double.infinity,
       child: ElevatedButton(
         onPressed: () {
-          print("Sign Up button pressed");
+          _validateFields(); // Re-validate all fields
+          if (!_isFormValid()) {
+            return; // Prevent submission if any field is invalid
+          }
+          // Proceed with sign-up logic
+          print("Sign Up button pressed with valid data");
+          print("Name: ${_nameController.text}");
+          print("Email: ${_emailController.text}");
+          print("Password: ${_passwordController.text}");
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: kPrimaryBlue,

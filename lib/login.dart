@@ -3,25 +3,73 @@ import 'package:flutter/material.dart';
 import 'colors.dart'; // Import our custom colors
 import 'package:flutter/gestures.dart';
 
-
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  String? _emailError;
+  String? _passwordError;
+
+  @override
+  void initState() {
+    super.initState();
+    // Add listeners for real-time validation
+    _emailController.addListener(_validateFields);
+    _passwordController.addListener(_validateFields);
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  // Validate all fields in real-time
+  void _validateFields() {
+    setState(() {
+      // Validate EMAIL
+      final emailPattern = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+      _emailError = _emailController.text.isEmpty
+          ? 'Email is required'
+          : !emailPattern.hasMatch(_emailController.text)
+          ? 'Enter a valid email'
+          : null;
+
+      // Validate PASSWORD
+      final passwordPattern = RegExp(r'^(?=.*[A-Z])(?=.*[!@#$%^&*]).{8,}$');
+      _passwordError = _passwordController.text.isEmpty
+          ? 'Password is required'
+          : !passwordPattern.hasMatch(_passwordController.text)
+          ? 'Password must be at least 8 characters, \ninclude an uppercase letter and a special symbol'
+          : null;
+    });
+  }
+
+  // Check if all fields are valid
+  bool _isFormValid() {
+    return _emailError == null &&
+        _passwordError == null &&
+        _emailController.text.isNotEmpty &&
+        _passwordController.text.isNotEmpty;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Using a SingleChildScrollView to prevent overflow when keyboard appears
     return Scaffold(
       backgroundColor: kWhite,
       body: SingleChildScrollView(
         child: SizedBox(
-          // Set a height that is at least the screen height
           height: MediaQuery.of(context).size.height,
           child: Stack(
             children: [
-              // The main content of the form
               _buildForm(context),
-
-              // The overlapping header circle
               _buildHeaderCircle(context),
             ],
           ),
@@ -46,7 +94,7 @@ class LoginScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const SizedBox(height: 80), // Adjust spacing from the top edge
+              const SizedBox(height: 80),
               GestureDetector(
                 onTap: () {
                   Navigator.of(context).pop();
@@ -54,7 +102,7 @@ class LoginScreen extends StatelessWidget {
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    SizedBox(width: 20), // Adjust icon position
+                    SizedBox(width: 20),
                     Icon(Icons.arrow_back, color: kWhite, size: 20),
                     SizedBox(width: 5),
                     Text(
@@ -84,8 +132,7 @@ class LoginScreen extends StatelessWidget {
     return Align(
       alignment: Alignment.bottomCenter,
       child: Container(
-        height:
-        650, // Fixed height, adjust as needed or use a fraction of screen height
+        height: 650,
         width: double.infinity,
         decoration: const BoxDecoration(
           color: kDarkBlue,
@@ -105,41 +152,55 @@ class LoginScreen extends StatelessWidget {
                 "Login",
                 style: TextStyle(
                     color: kWhite, fontSize: 36, fontWeight: FontWeight.bold),
-              ), 
-            RichText(
-              text: TextSpan(
-                style: const TextStyle(color: kGreyText, fontSize: 14),
-                children: [
-                  const TextSpan(text: "Don't have an account "),
-                  TextSpan(
-                    text: 'Sign Up here.',
-                    style: const TextStyle(
-                      color: kPrimaryBlue,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    recognizer: TapGestureRecognizer()
-                      ..onTap = () {
-                        Navigator.pushNamed(context, '/signup');
-                      },
-                  ),
-                ],
               ),
-            ),
+              RichText(
+                text: TextSpan(
+                  style: const TextStyle(color: kGreyText, fontSize: 14),
+                  children: [
+                    const TextSpan(text: "Don't have an account "),
+                    TextSpan(
+                      text: 'Sign Up here.',
+                      style: const TextStyle(
+                        color: kPrimaryBlue,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      recognizer: TapGestureRecognizer()
+                        ..onTap = () {
+                          Navigator.pushNamed(context, '/signup');
+                        },
+                    ),
+                  ],
+                ),
+              ),
               const Spacer(flex: 1),
               const Text("EMAIL", style: TextStyle(color: kGreyText)),
               const SizedBox(height: 8),
-              _buildTextField(hint: 'hello@reallygreatsite.com'),
+              _buildTextField(
+                hint: 'hello@reallygreatsite.com',
+                controller: _emailController,
+                errorText: _emailError,
+              ),
               const SizedBox(height: 20),
               const Text("PASSWORD", style: TextStyle(color: kGreyText)),
               const SizedBox(height: 8),
-              _buildTextField(hint: '******', obscureText: true),
+              _buildTextField(
+                hint: '******',
+                obscureText: true,
+                controller: _passwordController,
+                errorText: _passwordError,
+              ),
               const SizedBox(height: 30),
               _buildLoginButton(),
               const SizedBox(height: 15),
-              const Center(
-                child: Text(
-                  'Forgot Password?',
-                  style: TextStyle(color: kGreyText, fontSize: 14),
+              Center(
+                child: GestureDetector(
+                  onTap: () {
+                    print("Forgot Password tapped");
+                  },
+                  child: const Text(
+                    'Forgot Password?',
+                    style: TextStyle(color: kGreyText, fontSize: 14),
+                  ),
                 ),
               ),
               const Spacer(flex: 1),
@@ -155,8 +216,14 @@ class LoginScreen extends StatelessWidget {
   }
 
   // Helper widget for TextFields to reduce repetition
-  Widget _buildTextField({required String hint, bool obscureText = false}) {
+  Widget _buildTextField({
+    required String hint,
+    bool obscureText = false,
+    TextEditingController? controller,
+    String? errorText,
+  }) {
     return TextField(
+      controller: controller,
       obscureText: obscureText,
       style: const TextStyle(color: kWhite),
       decoration: InputDecoration(
@@ -170,6 +237,8 @@ class LoginScreen extends StatelessWidget {
         ),
         contentPadding:
         const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+        errorText: errorText,
+        errorStyle: const TextStyle(color: Colors.redAccent),
       ),
     );
   }
@@ -180,8 +249,14 @@ class LoginScreen extends StatelessWidget {
       width: double.infinity,
       child: ElevatedButton(
         onPressed: () {
-          // TODO: Implement Login Logic
-          print("Login button pressed");
+          _validateFields(); // Re-validate all fields
+          if (!_isFormValid()) {
+            return; // Prevent submission if any field is invalid
+          }
+          // Proceed with login logic
+          print("Login button pressed with valid data");
+          print("Email: ${_emailController.text}");
+          print("Password: ${_passwordController.text}");
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: kPrimaryBlue,
@@ -191,7 +266,7 @@ class LoginScreen extends StatelessWidget {
           ),
         ),
         child: const Text(
-          'Login', // Changed from "Sign Up" to "Login" for logical consistency
+          'Login',
           style: TextStyle(fontSize: 18, color: kWhite),
         ),
       ),
@@ -218,7 +293,6 @@ class LoginScreen extends StatelessWidget {
       width: double.infinity,
       child: OutlinedButton.icon(
         onPressed: () {
-          // TODO: Implement Google Sign-In
           print("Continue with Google pressed");
         },
         icon: Image.asset(
