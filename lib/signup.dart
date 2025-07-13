@@ -1,8 +1,10 @@
-import 'dart:io';
+import 'dart:async';
+import 'package:cherry_toast/cherry_toast.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'colors.dart'; // Make sure you have this file with your color constants
+import 'package:google_sign_in/google_sign_in.dart';
+import 'colors.dart'; // Ensure this file exists with your color constants
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -12,7 +14,6 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
-  XFile? _selectedImage; // Variable to store the selected image
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -21,11 +22,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
   String? _emailError;
   String? _passwordError;
   String? _confirmPasswordError;
+  bool _isLoading = false; // Loading state for sign-up button
+  Timer? _debounce; // Debounce timer for validation
 
   @override
   void initState() {
     super.initState();
-    // Add listeners for real-time validation
     _nameController.addListener(_validateFields);
     _emailController.addListener(_validateFields);
     _passwordController.addListener(_validateFields);
@@ -34,6 +36,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -41,56 +44,34 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
-  // Function to pick an image from the gallery
-  Future<void> _pickImage() async {
-    try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        setState(() {
-          _selectedImage = image;
-        });
-      }
-    } catch (e) {
-      print("Error picking image: $e");
-    }
-  }
-
-  // Validate all fields in real-time
   void _validateFields() {
-    setState(() {
-      autovalidateMode: AutovalidateMode.onUserInteraction;
-      // Validate NAME
-      _nameError = _nameController.text.isEmpty ? 'Name is required' : null;
-
-      // Validate EMAIL
-      final emailPattern = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-      _emailError = _emailController.text.isEmpty
-          ? 'Email is required'
-          : !emailPattern.hasMatch(_emailController.text)
-          ? 'Enter a valid email'
-          : null;
-
-      // Validate PASSWORD
-      final passwordPattern = RegExp(r'^(?=.*[A-Z])(?=.*[!@#$%^&*]).{8,}$');
-      _passwordError = _passwordController.text.isEmpty
-          ? 'Password is required'
-          : !passwordPattern.hasMatch(_passwordController.text)
-          ? 'Password must be at least 8 characters,\ninclude an uppercase letter and a special symbol'
-          : null;
-
-      // Validate CONFIRM PASSWORD
-      _confirmPasswordError = _confirmPasswordController.text.isEmpty
-          ? 'Confirm password is required'
-          : !passwordPattern.hasMatch(_confirmPasswordController.text)
-          ? 'Confirm password must be at least 8 characters, include an uppercase letter and a special symbol'
-          : _passwordController.text != _confirmPasswordController.text
-          ? 'Passwords do not match'
-          : null;
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      setState(() {
+        _nameError = _nameController.text.isEmpty ? 'Name is required' : null;
+        final emailPattern = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+        _emailError = _emailController.text.isEmpty
+            ? 'Email is required'
+            : !emailPattern.hasMatch(_emailController.text)
+            ? 'Enter a valid email'
+            : null;
+        final passwordPattern = RegExp(r'^(?=.*[A-Z])(?=.*[!@#$%^&*]).{8,}$');
+        _passwordError = _passwordController.text.isEmpty
+            ? 'Password is required'
+            : !passwordPattern.hasMatch(_passwordController.text)
+            ? 'Password must be at least 8 characters,\ninclude an uppercase letter and a special symbol'
+            : null;
+        _confirmPasswordError = _confirmPasswordController.text.isEmpty
+            ? 'Confirm password is required'
+            : !passwordPattern.hasMatch(_confirmPasswordController.text)
+            ? 'Confirm password must be at least 8 characters,\ninclude an uppercase letter and a special symbol'
+            : _passwordController.text != _confirmPasswordController.text
+            ? 'Passwords do not match'
+            : null;
+      });
     });
   }
 
-  // Check if all fields are valid
   bool _isFormValid() {
     return _nameError == null &&
         _emailError == null &&
@@ -115,7 +96,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  // --- WIDGET for the top overlapping circle ---
   Widget _buildHeaderCircle(BuildContext context) {
     return Positioned(
       top: -45,
@@ -142,20 +122,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     SizedBox(width: 20),
                     Icon(Icons.arrow_back, color: kWhite, size: 20),
                     SizedBox(width: 5),
-                    Text(
-                      'Back',
-                      style: TextStyle(color: kWhite, fontSize: 20),
-                    ),
+                    Text('Back', style: TextStyle(color: kWhite, fontSize: 20)),
                   ],
                 ),
               ),
               const Text(
                 'Sign Up',
-                style: TextStyle(
-                  color: kWhite,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(color: kWhite, fontSize: 32, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -164,7 +137,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  // --- WIDGET FOR THE MAIN FORM WITH INTERNAL SCROLLING ---
   Widget _buildForm(BuildContext context) {
     return Align(
       alignment: Alignment.bottomCenter,
@@ -186,8 +158,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
               const SizedBox(height: 40),
               _buildHeaderText(context),
               const SizedBox(height: 20),
-              _buildProfileIcon(),
-              const SizedBox(height: 20),
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
@@ -195,38 +165,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     children: [
                       const Text("NAME", style: TextStyle(color: kGreyText)),
                       const SizedBox(height: 8),
-                      _buildTextField(
-                        hint: 'Jiara Martins',
-                        controller: _nameController,
-                        errorText: _nameError,
-                      ),
+                      _buildTextField(hint: 'Jiara Martins', controller: _nameController, errorText: _nameError),
                       const SizedBox(height: 20),
                       const Text("EMAIL", style: TextStyle(color: kGreyText)),
                       const SizedBox(height: 8),
-                      _buildTextField(
-                        hint: 'hello@reallygreatsite.com',
-                        controller: _emailController,
-                        errorText: _emailError,
-                      ),
+                      _buildTextField(hint: 'hello@reallygreatsite.com', controller: _emailController, errorText: _emailError),
                       const SizedBox(height: 20),
                       const Text("PASSWORD", style: TextStyle(color: kGreyText)),
                       const SizedBox(height: 8),
-                      _buildTextField(
-                        hint: '******',
-                        obscureText: true,
-                        controller: _passwordController,
-                        errorText: _passwordError,
-                      ),
+                      _buildTextField(hint: '******', obscureText: true, controller: _passwordController, errorText: _passwordError),
                       const SizedBox(height: 20),
-                      const Text("CONFIRM PASSWORD",
-                          style: TextStyle(color: kGreyText)),
+                      const Text("CONFIRM PASSWORD", style: TextStyle(color: kGreyText)),
                       const SizedBox(height: 8),
-                      _buildTextField(
-                        hint: '******',
-                        obscureText: true,
-                        controller: _confirmPasswordController,
-                        errorText: _confirmPasswordError,
-                      ),
+                      _buildTextField(hint: '******', obscureText: true, controller: _confirmPasswordController, errorText: _confirmPasswordError),
                       const SizedBox(height: 30),
                       _buildSignUpButton(),
                       const SizedBox(height: 20),
@@ -245,16 +196,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  // --- ALL HELPER WIDGETS BELOW ---
   Widget _buildHeaderText(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          "Create new Account",
-          style: TextStyle(
-              color: kWhite, fontSize: 32, fontWeight: FontWeight.bold),
-        ),
+        const Text("Create new Account", style: TextStyle(color: kWhite, fontSize: 32, fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
         RichText(
           text: TextSpan(
@@ -263,12 +209,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
               const TextSpan(text: "Already Registered? "),
               TextSpan(
                 text: 'Log in here.',
-                style: const TextStyle(
-                    color: kPrimaryBlue, fontWeight: FontWeight.bold),
-                recognizer: TapGestureRecognizer()
-                  ..onTap = () {
-                    Navigator.pushNamed(context, '/login');
-                  },
+                style: const TextStyle(color: kPrimaryBlue, fontWeight: FontWeight.bold),
+                recognizer: TapGestureRecognizer()..onTap = () => Navigator.pushNamed(context, '/login'),
               ),
             ],
           ),
@@ -277,55 +219,32 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  Widget _buildProfileIcon() {
-    return Center(
-      child: GestureDetector(
-        onTap: _pickImage,
-        child: Container(
-          height: 90,
-          width: 90,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: kGreyText, width: 1.5),
-            image: _selectedImage != null
-                ? DecorationImage(
-              image: FileImage(File(_selectedImage!.path)),
-              fit: BoxFit.cover,
+  Widget _buildTextField({required String hint, bool obscureText = false, TextEditingController? controller, String? errorText}) {
+    return StatefulBuilder(
+      builder: (context, setState) {
+        bool isObscured = obscureText;
+        return TextField(
+          controller: controller,
+          obscureText: isObscured,
+          style: const TextStyle(color: kWhite),
+          decoration: InputDecoration(
+            fillColor: kTextFieldBackground,
+            filled: true,
+            hintText: hint,
+            hintStyle: const TextStyle(color: kGreyText),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(15.0), borderSide: BorderSide.none),
+            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+            errorText: errorText,
+            errorStyle: const TextStyle(color: Colors.redAccent),
+            suffixIcon: obscureText
+                ? IconButton(
+              icon: Icon(isObscured ? Icons.visibility : Icons.visibility_off, color: kGreyText),
+              onPressed: () => setState(() => isObscured = !isObscured),
             )
                 : null,
           ),
-          child: _selectedImage == null
-              ? const Icon(Icons.person_outline, color: kGreyText, size: 30)
-              : null,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required String hint,
-    bool obscureText = false,
-    TextEditingController? controller,
-    String? errorText,
-  }) {
-    return TextField(
-      controller: controller,
-      obscureText: obscureText,
-      style: const TextStyle(color: kWhite),
-      decoration: InputDecoration(
-        fillColor: kTextFieldBackground,
-        filled: true,
-        hintText: hint,
-        hintStyle: const TextStyle(color: kGreyText),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15.0),
-          borderSide: BorderSide.none,
-        ),
-        contentPadding:
-        const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-        errorText: errorText,
-        errorStyle: const TextStyle(color: Colors.redAccent),
-      ),
+        );
+      },
     );
   }
 
@@ -333,28 +252,53 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
-        onPressed: () {
-          _validateFields(); // Re-validate all fields
+        onPressed: _isLoading
+            ? null
+            : () async {
+          setState(() => _isLoading = true);
+          _validateFields();
           if (!_isFormValid()) {
-            return; // Prevent submission if any field is invalid
+            setState(() => _isLoading = false);
+            CherryToast.error(
+              title: const Text('Error'),
+              description: const Text('Please fix the errors in the form'),
+              animationDuration: const Duration(milliseconds: 500),
+              autoDismiss: true,
+            ).show(context);
+            return;
           }
-          // Proceed with sign-up logic
-          print("Sign Up button pressed with valid data");
-          print("Name: ${_nameController.text}");
-          print("Email: ${_emailController.text}");
-          print("Password: ${_passwordController.text}");
+          try {
+            UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+              email: _emailController.text.trim(),
+              password: _passwordController.text.trim(),
+            );
+            await userCredential.user?.updateDisplayName(_nameController.text.trim());
+            CherryToast.success(
+              title: const Text('Success'),
+              description: Text('Account created for ${_emailController.text}'),
+              animationDuration: const Duration(milliseconds: 500),
+              autoDismiss: true,
+            ).show(context);
+            Navigator.pushReplacementNamed(context, '/login');
+          } catch (e) {
+            CherryToast.error(
+              title: const Text('Error'),
+              description: Text('Failed to create account: ${e.toString()}'),
+              animationDuration: const Duration(milliseconds: 500),
+              autoDismiss: true,
+            ).show(context);
+          } finally {
+            setState(() => _isLoading = false);
+          }
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: kPrimaryBlue,
           padding: const EdgeInsets.symmetric(vertical: 16.0),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15.0),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
         ),
-        child: const Text(
-          'Sign Up',
-          style: TextStyle(fontSize: 18, color: kWhite),
-        ),
+        child: _isLoading
+            ? const CircularProgressIndicator(color: kWhite)
+            : const Text('Sign Up', style: TextStyle(fontSize: 18, color: kWhite)),
       ),
     );
   }
@@ -363,10 +307,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return const Row(
       children: [
         Expanded(child: Divider(color: kGreyText)),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 10),
-          child: Text("OR", style: TextStyle(color: kGreyText)),
-        ),
+        Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: Text("OR", style: TextStyle(color: kGreyText))),
         Expanded(child: Divider(color: kGreyText)),
       ],
     );
