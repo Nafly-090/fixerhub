@@ -59,6 +59,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   // Validate all fields in real-time
   void _validateFields() {
     setState(() {
+      autovalidateMode: AutovalidateMode.onUserInteraction;
       // Validate NAME
       _nameError = _nameController.text.isEmpty ? 'Name is required' : null;
 
@@ -117,7 +118,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   // --- WIDGET for the top overlapping circle ---
   Widget _buildHeaderCircle(BuildContext context) {
     return Positioned(
-      top: -60,
+      top: -45,
       left: -40,
       child: Container(
         height: 200,
@@ -143,7 +144,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     SizedBox(width: 5),
                     Text(
                       'Back',
-                      style: TextStyle(color: kWhite, fontSize: 16),
+                      style: TextStyle(color: kWhite, fontSize: 20),
                     ),
                   ],
                 ),

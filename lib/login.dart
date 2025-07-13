@@ -1,4 +1,3 @@
-import 'package:fixerhub/wellcome.dart';
 import 'package:flutter/material.dart';
 import 'colors.dart'; // Import our custom colors
 import 'package:flutter/gestures.dart';
@@ -195,6 +194,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Center(
                 child: GestureDetector(
                   onTap: () {
+                    Navigator.pushNamed(context, '/resetpswd');
                     print("Forgot Password tapped");
                   },
                   child: const Text(
