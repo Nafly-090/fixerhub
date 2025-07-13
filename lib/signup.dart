@@ -317,12 +317,57 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
-        onPressed: () {
-          print("Continue with Google pressed");
+        onPressed: _isLoading
+            ? null
+            : () async {
+          setState(() => _isLoading = true);
+          try {
+            // Use singleton instance and initialize
+            final GoogleSignIn googleSignIn = GoogleSignIn();
+            final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+            if (googleUser == null) {
+              // User canceled the sign-in
+              setState(() => _isLoading = false);
+              return;
+            }
+
+            // Obtain auth details
+            final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+            // Create Firebase credential
+            final credential = GoogleAuthProvider.credential(
+              accessToken: googleAuth.accessToken,
+              idToken: googleAuth.idToken,
+            );
+
+            // Sign in to Firebase
+            final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+
+            // Show success toast
+            CherryToast.success(
+              title: const Text('Success'),
+              description: Text('Signed in as ${userCredential.user?.displayName ?? 'User'}'),
+              animationDuration: const Duration(milliseconds: 500),
+              autoDismiss: true,
+            ).show(context);
+
+            // Navigate to home screen
+            Navigator.pushReplacementNamed(context, '/home');
+          } catch (e) {
+            // Show error toast
+            CherryToast.error(
+              title: const Text('Error'),
+              description: Text('Google Sign-In failed: ${e.toString()}'),
+              animationDuration: const Duration(milliseconds: 500),
+              autoDismiss: true,
+            ).show(context);
+          } finally {
+            setState(() => _isLoading = false);
+          }
         },
         icon: Image.asset('assets/images/google.png', height: 20.0),
         label: const Text(
-          'Continue with google',
+          'Continue with Google',
           style: TextStyle(fontSize: 16, color: kWhite),
         ),
         style: OutlinedButton.styleFrom(
